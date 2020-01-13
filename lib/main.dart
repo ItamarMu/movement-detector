@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:io';
 
 import 'package:audioplayers/audio_cache.dart';
 import 'package:audioplayers/audioplayers.dart';
@@ -12,7 +11,7 @@ class MyApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Flutter Demo',
+      title: 'Phone Guard',
       theme: ThemeData(
         primarySwatch: Colors.green,
       ),
@@ -29,183 +28,145 @@ class App extends StatefulWidget {
 class AppState extends State<App> {
   AudioPlayer audioPlayer = AudioPlayer();
   AudioCache audioCache;
-  bool musicPlaying = false;
+  bool testAlarmPlaying = false;
+  bool alarmPlaying = false;
+  bool detectorSwitch = false;
+  double sliderValue = 1;
+  static final String ALARM_BUTTON_INIT_TEXT = "Set alarm on";
+  String alarmButtonText = ALARM_BUTTON_INIT_TEXT;
+  StreamSubscription streamSubscription;
+
+  @override
+  void initState() {
+    super.initState();
+  }
 
   @override
   Widget build(BuildContext context) {
     audioCache = AudioCache(fixedPlayer: audioPlayer);
     return Scaffold(
-        appBar: AppBar(
-          title: Text('Title'),
+      backgroundColor: Colors.green[900],
+      appBar: AppBar(
+        title: Text(
+          'Phone Guard',
+          style: TextStyle(color: Colors.black),
         ),
-        body: Center(child: playPauseButton()));
+      ),
+      body: Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: <Widget>[
+            turnOnAlarmButton(),
+            SizedBox(height: 50),
+            playPauseButton(),
+            SizedBox(height: 50),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: <Widget>[
+                Text('Volume'),
+                Container(width: 220, child: volumeSlider()),
+              ],
+            )
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget turnOnAlarmButton() {
+    return RaisedButton(
+      onPressed: testAlarmPlaying ? null : turnOnOffMovementDetector,
+      color: Colors.red[900],
+      child: Text(alarmButtonText),
+    );
   }
 
   Widget playPauseButton() {
-    return GestureDetector(
-        onTap: playOrPauseAlarm,
-        child: Container(
-            padding: EdgeInsets.all(12.0),
-            decoration: BoxDecoration(
-              color: Theme.of(context).buttonColor,
-              borderRadius: BorderRadius.circular(8.0),
-            ),
-            child: Text(musicPlaying ? 'Pause' : 'Play')));
+    return RaisedButton(
+        onPressed: detectorSwitch ? null : testAlarm,
+        color: Colors.red[900],
+        child: Text(testAlarmPlaying ? 'Stop' : 'Test sound'));
   }
 
-  playOrPauseAlarm() {
-    if (musicPlaying) {
-      audioPlayer.stop();
-    } else {
-      audioCache.play('alarm16s.mp3');
-    }
+  Widget volumeSlider() {
+    return Slider(
+      value: sliderValue,
+      divisions: 8,
+      activeColor: Colors.red[900],
+      onChanged: (newVal) {
+        setState(() {
+          sliderValue = newVal;
+        });
+      },
+      onChangeEnd: (newVal) {
+        updateVolumeDuringAlarm(newVal);
+      },
+    );
+  }
+
+  testAlarm() {
+    playOrPauseAlarm(testAlarmPlaying);
     setState(() {
-      musicPlaying = !musicPlaying;
+      testAlarmPlaying = !testAlarmPlaying;
     });
   }
 
-/**
- * TODO implement movementDetector (widget)(?)
- */
-}
-/*
-class PlayPauseButton extends StatefulWidget {
-  @override
-  PlayPauseButtonState createState() => new PlayPauseButtonState();
-}
-
-class PlayPauseButtonState extends State<StatefulWidget> {
-  AudioPlayer audioPlayer = AudioPlayer();
-  AudioCache audioCache;
-  bool musicPlaying = false;
-
-  @override
-  void initState() {
-    super.initState();
-    audioCache = AudioCache(fixedPlayer: audioPlayer);
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-        onTap: playOrPauseAlarm,
-        child: Container(
-            padding: EdgeInsets.all(12.0),
-            decoration: BoxDecoration(
-              color: Theme.of(context).buttonColor,
-              borderRadius: BorderRadius.circular(8.0),
-            ),
-            child: Text(musicPlaying ? 'Pause' : 'Play')));
-  }
-
-  playOrPauseAlarm() {
-    if (musicPlaying) {
+  playOrPauseAlarm(bool playing) {
+    if (playing) {
       audioPlayer.stop();
     } else {
-      audioCache.play('alarm16s.mp3');
+      audioCache.loop('alarm16s.mp3', volume: sliderValue);
+    }
+  }
+
+  turnOnOffMovementDetector() {
+    if (!detectorSwitch) {
+      streamSubscription =
+          accelerometerEvents.listen((AccelerometerEvent event) {
+        if (event.x.abs() > 1 || event.y.abs() > 1) {
+          playOrPauseAlarm(alarmPlaying);
+          print("turned on alarm");
+          setState(() {
+            alarmPlaying = true;
+            alarmButtonTextMethod();
+            streamSubscription.cancel();
+          });
+        }
+      });
+    } else {
+      streamSubscription.cancel();
+    }
+    if (alarmPlaying) {
+      playOrPauseAlarm(alarmPlaying);
+      alarmPlaying = false;
     }
     setState(() {
-      musicPlaying = !musicPlaying;
+      detectorSwitch = !detectorSwitch;
+    });
+    alarmButtonTextMethod();
+  }
+
+  alarmButtonTextMethod() {
+    setState(() {
+      if (alarmPlaying) {
+        alarmButtonText = "Stop alarm";
+        return null;
+      }
+      if (detectorSwitch) {
+        alarmButtonText = "Set alarm off";
+        return null;
+      }
+      alarmButtonText = ALARM_BUTTON_INIT_TEXT;
+    });
+  }
+
+  updateVolumeDuringAlarm(double newVal) {
+    setState(() {
+      sliderValue = newVal;
+      if (alarmPlaying || testAlarmPlaying) {
+        audioPlayer.pause();
+        audioCache.loop('alarm16s.mp3', volume: sliderValue);
+      }
     });
   }
 }
-*/
-//class Sensors extends StatefulWidget {
-//  Sensors({Key key, this.title}) : super(key: key);
-//  AudioPlayer _audioPlayer = AudioPlayer();
-//
-//  final String title;
-//
-//  @override
-//  _SensorsState createState() => _SensorsState();
-//}
-//
-//class _SensorsState extends State<Sensors> {
-//  int _counter = 0;
-//  bool alarmPlaying = false;
-//  static AudioPlayer audioPlayer =  AudioPlayer();
-//  AudioCache audioCache = new AudioCache(fixedPlayer: audioPlayer);
-//  List<double> _accelerometerValues;
-//  List<StreamSubscription<dynamic>> _streamSubscriptions = <StreamSubscription<dynamic>>[];
-//
-//  @override
-//  void initState() {
-//    super.initState();
-//    _streamSubscriptions
-//        .add(accelerometerEvents.listen((AccelerometerEvent event) {
-//      setState(() {
-//        _accelerometerValues = <double>[event.x, event.y, event.z];
-////        print(event.x);
-//      });
-//    }));
-//  }
-//
-//  void _incrementCounter() {
-//    setState(() {
-//      if (!alarmPlaying) {
-//        audioCache.play('alarm16s.mp3');
-//      } else {
-//        audioPlayer.stop();
-//      }
-//      alarmPlaying = !alarmPlaying;
-//    });
-//  }
-//
-//  @override
-//  Widget build(BuildContext context) {
-//    final List<String> accelerometer =
-//    _accelerometerValues?.map((double v) => v.toStringAsFixed(1))?.toList();
-//
-//    return Scaffold(
-//      appBar: AppBar(
-//        title: Text(widget.title),
-//      ),
-//      body: Center(
-//        child: Column(
-//          mainAxisAlignment: MainAxisAlignment.center,
-//          children: <Widget>[
-//            localAsset(),
-//            Text(
-//              'You have pushed the button this many times:',
-//            ),
-//            Text(
-//              '$_counter',
-//              style: Theme.of(context).textTheme.display1,
-//            ),
-//            FloatingActionButton(
-//              onPressed: _incrementCounter,
-//              tooltip: 'Inc',
-//              child: Icon(Icons.add),
-//            ),
-//          ],
-//        ),
-//      ),
-//    );
-//  }
-//  Widget _tab(List<Widget> children) {
-//    return Center(
-//      child: Container(
-//        padding: EdgeInsets.all(16.0),
-//        child: Column(
-//          children: children
-//              .map((w) => Container(child: w, padding: EdgeInsets.all(6.0)))
-//              .toList(),
-//        ),
-//      ),
-//    );
-//  }
-//  Widget _btn(String txt, VoidCallback onPressed) {
-//    return ButtonTheme(
-//        minWidth: 48.0,
-//        child: RaisedButton(child: Text(txt), onPressed: onPressed));
-//  }
-//
-//  Widget localAsset() {
-//
-//
-//    return _tab([
-//      Text('Play Local Asset \'alarm16s.mp3\':'),
-//      _btn('Play', () => audioCache.play('alarm16s.mp3')),
-//      _btn('Pause', () => audioPlayer.stop())
-//    ]);
-//  }
